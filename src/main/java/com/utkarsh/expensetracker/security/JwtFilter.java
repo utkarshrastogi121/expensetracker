@@ -30,20 +30,16 @@ public class JwtFilter extends OncePerRequestFilter {
         String token = null;
         String email = null;
 
-        // 1. Extract token from standard "Bearer <token>" format
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
             try {
                 email = jwtService.extractEmail(token);
             } catch (Exception e) {
-                // Token is malformed or expired
                 logger.error("JWT token verification failed: " + e.getMessage());
             }
         }
 
-        // 2. Set authentication context if valid and not already authenticated
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // We pass an empty list of authorities/roles since we aren't using role-based auth yet
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
 
