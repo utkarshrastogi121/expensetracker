@@ -50,21 +50,20 @@ public class ExpenseServiceImpl implements ExpenseService {
         expense.setUser(user);
         expense.setCategory(category);
 
-        // Ensure date is set
         if (expense.getDate() == null) expense.setDate(LocalDate.now());
 
-        // 1. Save the Expense
+        // Save the Expense
         Expense savedExpense = expenseRepository.save(expense);
 
-        // 2. Calculate Monthly Range
+        // Calculate Monthly Range
         LocalDate startOfMonth = expense.getDate().withDayOfMonth(1);
         LocalDate endOfMonth = expense.getDate().withDayOfMonth(expense.getDate().lengthOfMonth());
         String monthKey = expense.getDate().format(DateTimeFormatter.ofPattern("MM-yyyy"));
 
-        // 3. Get total spent for the user this month from DB
+        //  Get total spent for the user this month from DB
         Double totalSpent = expenseRepository.getTotalSpentByUserIdInPeriod(userId, startOfMonth, endOfMonth);
 
-        // 4. Check against Budget
+        // Check against Budget
         var budgetOpt = budgetRepository.findByUserIdAndMonthYear(userId, monthKey);
 
         boolean exceeded = false;
@@ -93,7 +92,6 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     @Override
-    // Caches individual category pages dynamically (e.g., 'category_expenses::3-page-0-size-10')
     @Cacheable(value = "category_expenses", key = "#categoryId + '-page-' + #pageable.pageNumber + '-size-' + #pageable.pageSize")
     public Page<Expense> getExpensesByCategory(Long categoryId, Pageable pageable) {
         System.out.println(">>> Fetching paginated expenses from DATABASE for category: " + categoryId);
@@ -104,6 +102,6 @@ public class ExpenseServiceImpl implements ExpenseService {
     @Cacheable(value = "all_expenses", key = "'page-' + #pageable.pageNumber + '-size-' + #pageable.pageSize")
     public Page<Expense> getAllExpenses(Pageable pageable) {
         System.out.println(">>> Fetching global paginated expenses from DATABASE");
-        return expenseRepository.findAll(pageable); // JpaRepository has built-in findAll(Pageable)
+        return expenseRepository.findAll(pageable);
     }
 }
