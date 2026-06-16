@@ -2,6 +2,7 @@ package com.utkarsh.expensetracker.controller;
 
 import com.utkarsh.expensetracker.entity.Category;
 import com.utkarsh.expensetracker.service.CategoryService;
+import jakarta.validation.Valid; // Added Import
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,7 +18,7 @@ public class CategoryController {
     }
 
     @PostMapping
-    public Category create(@RequestBody Category category) {
+    public Category create(@Valid @RequestBody Category category) { // Added @Valid
         return categoryService.createCategory(category);
     }
 

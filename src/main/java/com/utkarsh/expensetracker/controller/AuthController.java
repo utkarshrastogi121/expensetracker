@@ -1,14 +1,12 @@
 package com.utkarsh.expensetracker.controller;
 
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.utkarsh.expensetracker.service.AuthService;
-import com.utkarsh.expensetracker.dto.SignupRequest;
-import com.utkarsh.expensetracker.dto.LoginRequest;
 import com.utkarsh.expensetracker.dto.AuthResponse;
+import com.utkarsh.expensetracker.dto.LoginRequest;
+import com.utkarsh.expensetracker.dto.SignupRequest;
+import com.utkarsh.expensetracker.service.AuthService;
+import jakarta.validation.Valid; // Added Import
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -21,16 +19,12 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public AuthResponse signup(@RequestBody SignupRequest request) {
-        return new AuthResponse(
-                authService.signup(request)
-        );
+    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) { // Added @Valid
+        return ResponseEntity.ok(authService.signup(request));
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@RequestBody LoginRequest request) {
-        return new AuthResponse(
-                authService.login(request)
-        );
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) { // Added @Valid
+        return ResponseEntity.ok(authService.login(request));
     }
 }

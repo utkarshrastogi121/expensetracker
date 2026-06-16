@@ -1,12 +1,12 @@
 package com.utkarsh.expensetracker.service.impl;
 
 import com.utkarsh.expensetracker.entity.Category;
+import com.utkarsh.expensetracker.exception.GlobalExceptionHandler.ResourceNotFoundException;
 import com.utkarsh.expensetracker.repository.CategoryRepository;
 import com.utkarsh.expensetracker.service.CategoryService;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,7 +31,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Cacheable(value = "category", key = "#id")
     public Category getCategoryById(Long id) {
         return categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
     }
 
     @Override

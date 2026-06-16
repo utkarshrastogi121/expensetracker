@@ -4,19 +4,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.io.Serializable;
-import java.time.LocalDate;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ExpenseDTO implements Serializable {
-
+public class MonthlyExpenseDTO implements Serializable {
     private static final long serialVersionUID = 1L;
-
-    private Long id;
-    private String title;
+    private String month;
     private Double amount;
-    private LocalDate date;
-    private Long categoryId;
-    private String categoryName;
 }

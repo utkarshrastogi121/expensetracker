@@ -1,8 +1,9 @@
 package com.utkarsh.expensetracker.service;
 
+import com.utkarsh.expensetracker.dto.UserDTO;
 import com.utkarsh.expensetracker.entity.User;
 
 public interface UserService {
-    User createUser(User user);
-    User getUserById(Long id);
+    UserDTO getCurrentUserProfile(String email);
+    UserDTO updateUserProfile(String email, User updateDetails);
 }

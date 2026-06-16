@@ -1,10 +1,14 @@
 package com.utkarsh.expensetracker.service.impl;
 
 import com.utkarsh.expensetracker.security.JwtService;
+import com.utkarsh.expensetracker.exception.GlobalExceptionHandler.ResourceNotFoundException;
+import com.utkarsh.expensetracker.exception.GlobalExceptionHandler.BudgetConfigurationException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.utkarsh.expensetracker.service.AuthService;
+import com.utkarsh.expensetracker.dto.AuthResponse;
+import com.utkarsh.expensetracker.dto.UserDTO;
 import com.utkarsh.expensetracker.dto.LoginRequest;
 import com.utkarsh.expensetracker.dto.SignupRequest;
 import com.utkarsh.expensetracker.entity.User;
@@ -27,9 +31,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public String signup(SignupRequest request) {
+    public AuthResponse signup(SignupRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists");
+            throw new BudgetConfigurationException("Email already exists");
         }
 
         User user = new User();
@@ -37,20 +41,35 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
-        return jwtService.generateToken(user.getEmail());
+        String token = jwtService.generateToken(savedUser.getEmail());
+        UserDTO userDto = mapToUserDTO(savedUser);
+
+        return new AuthResponse(token, userDto);
     }
 
     @Override
-    public String login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + request.getEmail()));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new BudgetConfigurationException("Invalid credentials");
         }
 
-        return jwtService.generateToken(user.getEmail());
+        String token = jwtService.generateToken(user.getEmail());
+        UserDTO userDto = mapToUserDTO(user);
+
+        return new AuthResponse(token, userDto);
+    }
+
+    // Helper to map entity to your existing clean UserDTO
+    private UserDTO mapToUserDTO(User user) {
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setName(user.getName());
+        dto.setEmail(user.getEmail());
+        return dto;
     }
 }

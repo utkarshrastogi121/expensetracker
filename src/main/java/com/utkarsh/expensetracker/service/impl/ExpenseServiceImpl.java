@@ -1,7 +1,10 @@
 package com.utkarsh.expensetracker.service.impl;
 
 import com.utkarsh.expensetracker.dto.BudgetResponseDTO;
+import com.utkarsh.expensetracker.dto.ExpenseDTO;
 import com.utkarsh.expensetracker.entity.*;
+import com.utkarsh.expensetracker.exception.GlobalExceptionHandler.ResourceNotFoundException;
+import com.utkarsh.expensetracker.exception.GlobalExceptionHandler.UnauthorizedAccessException;
 import com.utkarsh.expensetracker.repository.*;
 import com.utkarsh.expensetracker.service.ExpenseService;
 import org.springframework.cache.annotation.CacheEvict;
@@ -10,10 +13,9 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Service
 public class ExpenseServiceImpl implements ExpenseService {
@@ -38,70 +40,160 @@ public class ExpenseServiceImpl implements ExpenseService {
     @Caching(evict = {
             @CacheEvict(value = "user_expenses", allEntries = true),
             @CacheEvict(value = "category_expenses", allEntries = true),
-            @CacheEvict(value = "all_expenses", allEntries = true)
+            @CacheEvict(value = "all_expenses", allEntries = true),
+            @CacheEvict(value = "filtered_expenses", allEntries = true),
+            @CacheEvict(value = "search_expenses", allEntries = true),
+            @CacheEvict(value = "analytics_summary", allEntries = true),
+            @CacheEvict(value = "analytics_category", allEntries = true),
+            @CacheEvict(value = "analytics_monthly", allEntries = true)
     })
-    public BudgetResponseDTO createExpense(Expense expense, Long userId, Long categoryId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
+    public BudgetResponseDTO createExpense(Expense expense, String email, Long categoryId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
         Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
 
         expense.setUser(user);
         expense.setCategory(category);
-
         if (expense.getDate() == null) expense.setDate(LocalDate.now());
 
-        // Save the Expense
         Expense savedExpense = expenseRepository.save(expense);
+        return checkBudgetAndBuildResponse(savedExpense, user.getId());
+    }
 
-        // Calculate Monthly Range
-        LocalDate startOfMonth = expense.getDate().withDayOfMonth(1);
-        LocalDate endOfMonth = expense.getDate().withDayOfMonth(expense.getDate().lengthOfMonth());
-        String monthKey = expense.getDate().format(DateTimeFormatter.ofPattern("MM-yyyy"));
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "user_expenses", allEntries = true),
+            @CacheEvict(value = "category_expenses", allEntries = true),
+            @CacheEvict(value = "all_expenses", allEntries = true),
+            @CacheEvict(value = "filtered_expenses", allEntries = true),
+            @CacheEvict(value = "search_expenses", allEntries = true),
+            @CacheEvict(value = "analytics_summary", allEntries = true),
+            @CacheEvict(value = "analytics_category", allEntries = true),
+            @CacheEvict(value = "analytics_monthly", allEntries = true)
+    })
+    public BudgetResponseDTO updateExpense(Long id, Expense expenseDetails, String email, Long categoryId) {
+        Expense existingExpense = expenseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found with id: " + id));
 
-        //  Get total spent for the user this month from DB
-        Double totalSpent = expenseRepository.getTotalSpentByUserIdInPeriod(userId, startOfMonth, endOfMonth);
-
-        // Check against Budget
-        var budgetOpt = budgetRepository.findByUserIdAndMonthYear(userId, monthKey);
-
-        boolean exceeded = false;
-        String message = "Expense saved successfully.";
-
-        if (budgetOpt.isPresent()) {
-            Double limit = budgetOpt.get().getMonthlyLimit();
-            if (totalSpent > limit) {
-                exceeded = true;
-                message = "BUDGET EXCEEDED! Total spent: " + totalSpent + " | Limit: " + limit;
-            } else {
-                message = "Within budget. Remaining: " + (limit - totalSpent);
-            }
-        } else {
-            message = "No budget set for " + monthKey;
+        if (!existingExpense.getUser().getEmail().equals(email)) {
+            throw new UnauthorizedAccessException("Unauthorized actions on this resource.");
         }
 
-        return new BudgetResponseDTO(savedExpense, exceeded, message);
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+
+        existingExpense.setTitle(expenseDetails.getTitle());
+        existingExpense.setAmount(expenseDetails.getAmount());
+        existingExpense.setCategory(category);
+        if (expenseDetails.getDate() != null) existingExpense.setDate(expenseDetails.getDate());
+
+        Expense updatedExpense = expenseRepository.save(existingExpense);
+        return checkBudgetAndBuildResponse(updatedExpense, existingExpense.getUser().getId());
     }
 
     @Override
-    @Cacheable(value = "user_expenses", key = "#userId + '-page-' + #pageable.pageNumber + '-size-' + #pageable.pageSize")
-    public Page<Expense> getExpensesByUser(Long userId, Pageable pageable) {
-        System.out.println(">>> Fetching paginated expenses from DATABASE for user: " + userId);
-        return expenseRepository.findByUserId(userId, pageable);
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "user_expenses", allEntries = true),
+            @CacheEvict(value = "category_expenses", allEntries = true),
+            @CacheEvict(value = "all_expenses", allEntries = true),
+            @CacheEvict(value = "filtered_expenses", allEntries = true),
+            @CacheEvict(value = "search_expenses", allEntries = true),
+            @CacheEvict(value = "analytics_summary", allEntries = true),
+            @CacheEvict(value = "analytics_category", allEntries = true),
+            @CacheEvict(value = "analytics_monthly", allEntries = true)
+    })
+    public void deleteExpense(Long id, String email) {
+        Expense existingExpense = expenseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found with id: " + id));
+
+        if (!existingExpense.getUser().getEmail().equals(email)) {
+            throw new UnauthorizedAccessException("Unauthorized actions on this resource.");
+        }
+        expenseRepository.delete(existingExpense);
     }
 
     @Override
-    @Cacheable(value = "category_expenses", key = "#categoryId + '-page-' + #pageable.pageNumber + '-size-' + #pageable.pageSize")
-    public Page<Expense> getExpensesByCategory(Long categoryId, Pageable pageable) {
-        System.out.println(">>> Fetching paginated expenses from DATABASE for category: " + categoryId);
-        return expenseRepository.findByCategoryId(categoryId, pageable);
+    @Cacheable(value = "user_expenses", key = "#email + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
+    public Page<ExpenseDTO> getExpensesByUser(String email, Pageable pageable) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        return expenseRepository.findByUserId(user.getId(), pageable).map(this::mapToDTO);
     }
 
     @Override
-    @Cacheable(value = "all_expenses", key = "'page-' + #pageable.pageNumber + '-size-' + #pageable.pageSize")
-    public Page<Expense> getAllExpenses(Pageable pageable) {
-        System.out.println(">>> Fetching global paginated expenses from DATABASE");
-        return expenseRepository.findAll(pageable);
+    @Cacheable(value = "filtered_expenses", key = "#email + '-' + #startDate.toString() + '-' + #endDate.toString() + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
+    public Page<ExpenseDTO> filterExpensesByDate(String email, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        return expenseRepository.findByUserIdAndDateBetween(user.getId(), startDate, endDate, pageable).map(this::mapToDTO);
+    }
+
+    @Override
+    @Cacheable(value = "search_expenses", key = "#email + '-' + #keyword + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
+    public Page<ExpenseDTO> searchExpenses(String email, String keyword, Pageable pageable) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        return expenseRepository.findByUserIdAndTitleContainingIgnoreCase(user.getId(), keyword, pageable).map(this::mapToDTO);
+    }
+
+    @Override
+    @Cacheable(value = "category_expenses", key = "#categoryId + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
+    public Page<ExpenseDTO> getExpensesByCategory(Long categoryId, Pageable pageable) {
+        return expenseRepository.findByCategoryId(categoryId, pageable).map(this::mapToDTO);
+    }
+
+    @Override
+    @Cacheable(value = "all_expenses", key = "'p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
+    public Page<ExpenseDTO> getAllExpenses(Pageable pageable) {
+        return expenseRepository.findAll(pageable).map(this::mapToDTO);
+    }
+
+    private BudgetResponseDTO checkBudgetAndBuildResponse(Expense expense, Long userId) {
+        int expenseMonth = expense.getDate().getMonthValue();
+        int expenseYear = expense.getDate().getYear();
+        Long categoryId = expense.getCategory().getId();
+        String categoryName = expense.getCategory().getName();
+
+        Double totalCategorySpent = expenseRepository.getTotalSpentByUserAndCategoryInMonth(
+                userId, categoryId, expenseMonth, expenseYear
+        );
+
+        var budgetOpt = budgetRepository.findByUserIdAndCategoryIdAndMonthAndYear(
+                userId, categoryId, expenseMonth, expenseYear
+        );
+
+        boolean exceeded = false;
+        String message;
+
+        if (budgetOpt.isPresent()) {
+            Double limit = budgetOpt.get().getAmount();
+            if (totalCategorySpent > limit) {
+                exceeded = true;
+                double overage = totalCategorySpent - limit;
+                message = categoryName + " budget exceeded by ₹" + String.format("%.0f", overage);
+            } else {
+                message = "Within budget. Remaining for " + categoryName + ": ₹" + String.format("%.0f", (limit - totalCategorySpent));
+            }
+        } else {
+            message = "No budget set for category " + categoryName;
+        }
+
+        // Returns your newly adapted ExpenseDTO within the response body
+        return new BudgetResponseDTO(mapToDTO(expense), exceeded, message);
+    }
+
+    // Helper mapping utility
+    private ExpenseDTO mapToDTO(Expense expense) {
+        return new ExpenseDTO(
+                expense.getId(),
+                expense.getTitle(),
+                expense.getAmount(),
+                expense.getDate(),
+                expense.getCategory() != null ? expense.getCategory().getId() : null,
+                expense.getCategory() != null ? expense.getCategory().getName() : null
+        );
     }
 }
