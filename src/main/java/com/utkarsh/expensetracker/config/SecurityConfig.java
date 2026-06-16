@@ -1,11 +1,11 @@
 package com.utkarsh.expensetracker.config;
 
 import com.utkarsh.expensetracker.security.JwtFilter;
-import io.swagger.v3.oas.models.Components; // Add import
-import io.swagger.v3.oas.models.OpenAPI;    // Add import
-import io.swagger.v3.oas.models.info.Info;   // Add import
-import io.swagger.v3.oas.models.security.SecurityRequirement; // Add import
-import io.swagger.v3.oas.models.security.SecurityScheme;    // Add import
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -28,23 +28,20 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
-                // Fixes frame blocking bugs common with certain Swagger dependencies
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .authorizeHttpRequests(auth -> auth
-                        // 1. PUBLIC AUTH ENDPOINTS
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // 2. PUBLIC SWAGGER UI & OPENAPI ENDPOINTS
+                        // swagger ui endpoints
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
                         .requestMatchers("/swagger-resources/**").permitAll()
                         .requestMatchers("/webjars/**").permitAll()
 
-                        // 3. SECURE EVERYTHING ELSE
                         .anyRequest().authenticated()
                 )
-                // CRITICAL FOR JWT: Tells Spring Security not to create or look for HTTP Sessions
+                // for Spring Security not to create or look for HTTP Sessions
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -52,7 +49,7 @@ public class SecurityConfig {
                 .build();
     }
 
-    // THIS IS THE MISSING BEAN THAT CREATES THE GREEN AUTHORIZE BUTTON
+    // Authorize button in swagger ui
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()

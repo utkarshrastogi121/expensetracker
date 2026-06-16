@@ -18,9 +18,7 @@ public class CacheConfig {
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
                 // Set default cache expiration to 10 minutes
                 .entryTtl(Duration.ofMinutes(10))
-                // Disable caching null values globally
                 .disableCachingNullValues()
-                // FIX: Use modern, non-deprecated RedisSerializer.json()
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
                         RedisSerializer.json()
                 ));
