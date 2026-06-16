@@ -17,6 +17,7 @@ public class ExpenseDTO implements Serializable {
     private String title;
     private Double amount;
     private LocalDate date;
+    private Long userId;
     private Long categoryId;
     private String categoryName;
 }

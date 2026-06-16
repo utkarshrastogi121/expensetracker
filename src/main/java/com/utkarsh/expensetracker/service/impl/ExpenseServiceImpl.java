@@ -192,6 +192,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 expense.getTitle(),
                 expense.getAmount(),
                 expense.getDate(),
+                expense.getUser() != null ? expense.getUser().getId() : null,
                 expense.getCategory() != null ? expense.getCategory().getId() : null,
                 expense.getCategory() != null ? expense.getCategory().getName() : null
         );
