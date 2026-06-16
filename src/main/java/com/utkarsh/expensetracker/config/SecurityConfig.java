@@ -1,0 +1,71 @@
+package com.utkarsh.expensetracker.config;
+
+import com.utkarsh.expensetracker.security.JwtFilter;
+import io.swagger.v3.oas.models.Components; // Add import
+import io.swagger.v3.oas.models.OpenAPI;    // Add import
+import io.swagger.v3.oas.models.info.Info;   // Add import
+import io.swagger.v3.oas.models.security.SecurityRequirement; // Add import
+import io.swagger.v3.oas.models.security.SecurityScheme;    // Add import
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    private final JwtFilter jwtFilter;
+
+    public SecurityConfig(JwtFilter jwtFilter) {
+        this.jwtFilter = jwtFilter;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .csrf(csrf -> csrf.disable())
+                // Fixes frame blocking bugs common with certain Swagger dependencies
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                .authorizeHttpRequests(auth -> auth
+                        // 1. PUBLIC AUTH ENDPOINTS
+                        .requestMatchers("/api/auth/**").permitAll()
+
+                        // 2. PUBLIC SWAGGER UI & OPENAPI ENDPOINTS
+                        .requestMatchers("/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui/**").permitAll()
+                        .requestMatchers("/swagger-ui.html").permitAll()
+                        .requestMatchers("/swagger-resources/**").permitAll()
+                        .requestMatchers("/webjars/**").permitAll()
+
+                        // 3. SECURE EVERYTHING ELSE
+                        .anyRequest().authenticated()
+                )
+                // CRITICAL FOR JWT: Tells Spring Security not to create or look for HTTP Sessions
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+
+    // THIS IS THE MISSING BEAN THAT CREATES THE GREEN AUTHORIZE BUTTON
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Smart Expense Tracker API")
+                        .version("1.0")
+                        .description("Production-ready Expense Tracker Backend with JWT Security"))
+                .addSecurityItem(new SecurityRequirement().addList("BearerAuthentication"))
+                .components(new Components()
+                        .addSecuritySchemes("BearerAuthentication", new SecurityScheme()
+                                .name("BearerAuthentication")
+                                .type(SecurityScheme.Type.HTTP)
+                                .scheme("bearer")
+                                .bearerFormat("JWT")));
+    }
+}
