@@ -30,16 +30,15 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
-    private final UserDetailsService userDetailsService; // Hook into your CustomUserDetailsService
+    private final UserDetailsService userDetailsService;
 
-    // Constructor updated to inject UserDetailsService alongside JwtFilter
     public SecurityConfig(JwtFilter jwtFilter, UserDetailsService userDetailsService) {
         this.jwtFilter = jwtFilter;
         this.userDetailsService = userDetailsService;
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationProvider authenticationProvider) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
@@ -47,27 +46,28 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // swagger ui endpoints
+                        // Swagger UI endpoints
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
                         .requestMatchers("/swagger-resources/**").permitAll()
                         .requestMatchers("/webjars/**").permitAll()
 
+                        // NOTE: /api/ai/** falls here and safely forces JWT Authentication
                         .anyRequest().authenticated()
                 )
-                // for Spring Security not to create or look for HTTP Sessions
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .authenticationProvider(authenticationProvider(null))
+                .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
+    // FIX: Using the newer overloaded constructor to register the UserDetailsService
     @Bean
-    public AuthenticationProvider authenticationProvider(PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
+    public AuthenticationProvider authenticationProvider(UserDetailsService service, PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(service);
         authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
     }
@@ -77,7 +77,6 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    // CORS policy mapping configuration bean
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -92,7 +91,6 @@ public class SecurityConfig {
         return source;
     }
 
-    // Authorize button in swagger ui
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
