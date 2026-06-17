@@ -31,7 +31,8 @@ public class Budget implements Serializable {
 
     @NotNull(message = "Budget amount cannot be null")
     @Positive(message = "Budget amount must be a positive number greater than 0")
-    @Column(nullable = false)
+    // FIX: Match the actual PostgreSQL column named "monthly_limit"
+    @Column(name = "monthly_limit", nullable = false)
     private Double amount;
 
     @NotNull(message = "Month cannot be null")
@@ -54,4 +55,17 @@ public class Budget implements Serializable {
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
+
+    // Maps the underlying constraint field name that PostgreSQL expects
+    @Column(name = "month_year", nullable = true)
+    private String monthYear;
+
+    // Automatically populates the constraint block field before Hibernate runs its insert statement
+    @PrePersist
+    @PreUpdate
+    public void assignMonthYearConstraintValue() {
+        if (this.month != null && this.year != null) {
+            this.monthYear = String.format("%02d-%d", this.month, this.year);
+        }
+    }
 }
