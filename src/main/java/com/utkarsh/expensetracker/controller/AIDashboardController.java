@@ -30,11 +30,12 @@ public class AIDashboardController {
     @Value("${gemini.api.key}")
     private String geminiApiKey;
 
-    private final String API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+    private final String BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-    public AIDashboardController(ExpenseRepository expenseRepository, UserRepository userRepository) {
+    public AIDashboardController(ExpenseRepository expenseRepository, UserRepository userRepository, @Value("${gemini.api.key}") String geminiApiKey) {
         this.expenseRepository = expenseRepository;
         this.userRepository = userRepository;
+        this.geminiApiKey = geminiApiKey;
     }
 
     @GetMapping("/generate-report")
@@ -51,10 +52,10 @@ public class AIDashboardController {
         Double totalSpent = expenseRepository.getTotalExpenseByUserId(userId);
         List<CategoryExpenseDTO> categoryExpenses = expenseRepository.getCategoryWiseExpenses(userId);
 
-        String breakdown = categoryExpenses.isEmpty()
+        String breakdown = (categoryExpenses == null || categoryExpenses.isEmpty())
                 ? "No dynamic expense metrics tracked yet."
                 : categoryExpenses.stream()
-                .map(c -> c.getCategory() + ": ₹" + c.getAmount())
+                .map(c -> (c.getCategory() != null ? c.getCategory() : "Uncategorized") + ": ₹" + c.getAmount())
                 .collect(Collectors.joining(", "));
 
         String systemPrompt = "You are an intelligent, supportive personal financial advisor. " +
@@ -70,27 +71,39 @@ public class AIDashboardController {
         );
 
         Map<String, Object> body = Map.of(
-                "model", "gemini-2.5-flash",
-                "messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", userPrompt)
+                "systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt))),
+                "contents", List.of(
+                        Map.of("role", "user", "parts", List.of(Map.of("text", userPrompt)))
                 )
         );
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        headers.setBearerAuth(geminiApiKey);
+        String targetedUrl = BASE_URL + "?key=" + geminiApiKey.trim();
 
         try {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(API_URL, entity, Map.class);
+            ResponseEntity<Map> response = restTemplate.postForEntity(targetedUrl, entity, Map.class);
 
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
-            String aiReport = (String) ((Map<String, Object>) choices.get(0).get("message")).get("content");
+            if (response.getBody() != null && response.getBody().containsKey("candidates")) {
+                List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.getBody().get("candidates");
+                if (candidates != null && !candidates.isEmpty()) {
+                    Map<String, Object> contentNode = (Map<String, Object>) candidates.get(0).get("content");
+                    if (contentNode != null && contentNode.containsKey("parts")) {
+                        List<Map<String, Object>> parts = (List<Map<String, Object>>) contentNode.get("parts");
+                        if (parts != null && !parts.isEmpty()) {
+                            String aiReport = (String) parts.get(0).get("text");
+                            return ResponseEntity.ok(Map.of("report", aiReport));
+                        }
+                    }
+                }
+            }
 
-            return ResponseEntity.ok(Map.of("report", aiReport));
+            return ResponseEntity.status(502).body(Map.of("report", "Unexpected response structure from Gemini API."));
+
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("report", "AI analysis engine offline: " + e.getMessage()));
         }
     }
