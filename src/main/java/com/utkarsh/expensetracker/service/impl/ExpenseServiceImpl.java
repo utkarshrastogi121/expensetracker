@@ -8,7 +8,6 @@ import com.utkarsh.expensetracker.exception.GlobalExceptionHandler.UnauthorizedA
 import com.utkarsh.expensetracker.repository.*;
 import com.utkarsh.expensetracker.service.ExpenseService;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -115,38 +114,38 @@ public class ExpenseServiceImpl implements ExpenseService {
         expenseRepository.delete(existingExpense);
     }
 
+    // FIX: Removed @Cacheable to avoid complex PageImpl serialization errors over Redis
     @Override
-    @Cacheable(value = "user_expenses", key = "#email + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
     public Page<ExpenseDTO> getExpensesByUser(String email, Pageable pageable) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
         return expenseRepository.findByUserId(user.getId(), pageable).map(this::mapToDTO);
     }
 
+    // FIX: Removed @Cacheable
     @Override
-    @Cacheable(value = "filtered_expenses", key = "#email + '-' + #startDate.toString() + '-' + #endDate.toString() + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
     public Page<ExpenseDTO> filterExpensesByDate(String email, LocalDate startDate, LocalDate endDate, Pageable pageable) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
         return expenseRepository.findByUserIdAndDateBetween(user.getId(), startDate, endDate, pageable).map(this::mapToDTO);
     }
 
+    // FIX: Removed @Cacheable
     @Override
-    @Cacheable(value = "search_expenses", key = "#email + '-' + #keyword + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
     public Page<ExpenseDTO> searchExpenses(String email, String keyword, Pageable pageable) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
         return expenseRepository.findByUserIdAndTitleContainingIgnoreCase(user.getId(), keyword, pageable).map(this::mapToDTO);
     }
 
+    // FIX: Removed @Cacheable
     @Override
-    @Cacheable(value = "category_expenses", key = "#categoryId + '-p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
     public Page<ExpenseDTO> getExpensesByCategory(Long categoryId, Pageable pageable) {
         return expenseRepository.findByCategoryId(categoryId, pageable).map(this::mapToDTO);
     }
 
+    // FIX: Removed @Cacheable
     @Override
-    @Cacheable(value = "all_expenses", key = "'p-' + #pageable.pageNumber + '-s-' + #pageable.pageSize + '-sort-' + #pageable.sort.toString()")
     public Page<ExpenseDTO> getAllExpenses(Pageable pageable) {
         return expenseRepository.findAll(pageable).map(this::mapToDTO);
     }
@@ -181,11 +180,9 @@ public class ExpenseServiceImpl implements ExpenseService {
             message = "No budget set for category " + categoryName;
         }
 
-        // Returns your newly adapted ExpenseDTO within the response body
         return new BudgetResponseDTO(mapToDTO(expense), exceeded, message);
     }
 
-    // Helper mapping utility
     private ExpenseDTO mapToDTO(Expense expense) {
         return new ExpenseDTO(
                 expense.getId(),
