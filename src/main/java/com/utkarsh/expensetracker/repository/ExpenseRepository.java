@@ -30,11 +30,12 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("endDate") LocalDate endDate
     );
 
+    // FIX: Replaced H2/MySQL specific date functions with standard JPQL EXTRACT queries
     @Query("SELECT COALESCE(SUM(e.amount), 0.0) FROM Expense e " +
             "WHERE e.user.id = :userId " +
             "AND e.category.id = :categoryId " +
-            "AND FUNCTION('MONTH', e.date) = :month " +
-            "AND FUNCTION('YEAR', e.date) = :year")
+            "AND EXTRACT(MONTH FROM e.date) = :month " +
+            "AND EXTRACT(YEAR FROM e.date) = :year")
     Double getTotalSpentByUserAndCategoryInMonth(
             @Param("userId") Long userId,
             @Param("categoryId") Long categoryId,
@@ -52,8 +53,11 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             "FROM Expense e WHERE e.user.id = :userId GROUP BY e.category.name")
     List<CategoryExpenseDTO> getCategoryWiseExpenses(@Param("userId") Long userId);
 
-    @Query("SELECT FUNCTION('FORMATDATETIME', e.date, 'MMM'), SUM(e.amount) " +
+    // FIX: Replaced H2-specific FORMATDATETIME function with portable EXTRACT calls.
+    // Note: This returns the numeric month value (1-12) instead of the 'MMM' name string.
+    // You can format '1' to 'Jan', '2' to 'Feb' etc., quickly in your Service layer or frontend!
+    @Query("SELECT EXTRACT(MONTH FROM e.date), SUM(e.amount) " +
             "FROM Expense e WHERE e.user.id = :userId " +
-            "GROUP BY FUNCTION('FORMATDATETIME', e.date, 'MMM')")
+            "GROUP BY EXTRACT(MONTH FROM e.date)")
     List<Object[]> getMonthlyExpensesRaw(@Param("userId") Long userId);
 }
