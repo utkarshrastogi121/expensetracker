@@ -2,6 +2,16 @@
 
 A secure and scalable Expense Management REST API built with Spring Boot, featuring JWT authentication, Redis caching, PostgreSQL, analytics, budgeting, and AI-powered financial insights using Gemini AI.
 
+## 🌐 Frontend
+
+The frontend for this project is built separately using modern web technologies and provides a clean and responsive UI for managing expenses.
+
+- 💻 Frontend Repository:  
+  https://github.com/utkarshrastogi121/expensetracker_ui
+
+- 🚀 Live Application:  
+  https://expensetrack-ui.vercel.app
+
 ## 🚀 Features
 
 - 🔐 JWT Authentication & Authorization
