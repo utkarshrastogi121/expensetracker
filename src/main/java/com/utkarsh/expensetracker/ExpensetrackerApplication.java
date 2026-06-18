@@ -11,6 +11,7 @@ public class ExpensetrackerApplication {
 
 	public static void main(String[] args) {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        System.out.println("ENV DATABASE_URL = " + System.getenv("DATABASE_URL"));
         SpringApplication.run(ExpensetrackerApplication.class, args);
 	}
 
